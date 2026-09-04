@@ -1,3 +1,4 @@
+import sys
 import tkinter as tk
 from tkinter import messagebox
 
@@ -8,27 +9,25 @@ class NaoControlPanel:
 	COLORS = {
 		"window": "#eeeeee",
 		"panel": "#f4f4f4",
-		"border": "#b8b8b8",
 		"text": "#171717",
 		"blue": "#2396e8",
 		"green": "#4caf50",
 		"red": "#ef5350",
-		"yellow": "#f3c64f",
 	}
 
-	def __init__(self, root):
+	def __init__(self, root, robot_ip=""):
 		self.root = root
 		self.root.title("NAO Robot Live Interaction Control Panel")
 		self.root.geometry("750x900")
 		self.root.minsize(680, 760)
 		self.root.configure(bg=self.COLORS["window"])
 
-		self.robot_ip = tk.StringVar(value="10.117.35.236")
+		self.robot_ip = tk.StringVar(value=robot_ip)
 		self.connection_status = tk.StringVar(value="Status: Disconnected")
 		self.speech_text = tk.StringVar()
 		self.event_status = tk.StringVar(value="Ready for an interaction session")
+		self.connected = False
 		self.video_running = True
-		self.video_canvas = None
 
 		self._build_header()
 		self._build_connection_section()
@@ -105,7 +104,7 @@ class NaoControlPanel:
 		tk.Label(section, text="Pre-scripted Utterances:", bg=self.COLORS["panel"]).pack(anchor="w")
 		utterances = tk.Frame(section, bg=self.COLORS["panel"])
 		utterances.pack(fill="x", pady=(11, 15))
-		for index, text in enumerate(("Greeting", "Gratitude", "Transition", "Farewell")):
+		for index, text in enumerate(("Hello", "Thanks", "Vulnerability", "Yo?", "Goodbye")):
 			self._button(
 				utterances,
 				text,
@@ -135,9 +134,9 @@ class NaoControlPanel:
 		section.pack(fill="x", padx=15, pady=15)
 
 		groups = (
-			("Nonverbal Gestures", ("Wave Hand (sitting)", "Wave Hand (standing)", "Nodding while Standing")),
-			("LED Facial Displays", ("LED: Blue (Thinking)", "LED: Green (Happy)", "LED: Red (Alert)")),
-			("Posture Changes", ("Stand", "Crouch", "Sit")),
+			("Nonverbal Gestures", (("Wave Hand (sitting)", "gray"), ("Wave Hand (standing)", "gray"), ("Nodding (standing)", "gray"))),
+			("LED Facial Displays", (("LED: Blue", "blue"), ("LED: Green", "green"), ("LED: Red", "red"))),
+			("Posture Changes", (("Stand", "gray"), ("Crouch", "gray"), ("Sit", "gray"))),
 		)
 		for column, (title, actions) in enumerate(groups):
 			group = tk.LabelFrame(
@@ -150,8 +149,8 @@ class NaoControlPanel:
 			)
 			group.grid(row=0, column=column, sticky="nsew", padx=(0 if column == 0 else 10, 0))
 			section.columnconfigure(column, weight=1)
-			for row, action in enumerate(actions):
-				color = self.COLORS["blue"] if "Blue" in action else self.COLORS["green"] if "Green" in action else self.COLORS["red"] if "Red" in action else "#dddddd"
+			for row, (action, color_name) in enumerate(actions):
+				color = self.COLORS.get(color_name, "#dddddd")
 				foreground = "white" if color != "#dddddd" else self.COLORS["text"]
 				self._button(
 					group,
@@ -165,15 +164,18 @@ class NaoControlPanel:
 	def _build_video_section(self):
 		section = self._section(self.root, "Live Robot Vision")
 		section.pack(fill="both", expand=True, padx=15, pady=(0, 0))
-		self.video_canvas = tk.Canvas(
+		self.video_message = tk.Label(
 			section,
-			width=320,
-			height=240,
-			bg="#252b33",
-			highlightthickness=1,
-			highlightbackground="#8c8c8c",
+			text="NO FEED FOUND",
+			width=34,
+			height=8,
+			bg="#202830",
+			fg="white",
+			relief="solid",
+			bd=1,
+			font=("TkDefaultFont", 12, "bold"),
 		)
-		self.video_canvas.pack(pady=(4, 7))
+		self.video_message.pack(pady=(4, 7))
 		self.video_button = self._button(
 			section,
 			"Stop Video Feed",
@@ -186,25 +188,13 @@ class NaoControlPanel:
 		tk.Label(section, textvariable=self.event_status, bg=self.COLORS["panel"], fg="#555555").pack(pady=(8, 0))
 
 	def _draw_video_preview(self):
-		canvas = self.video_canvas
-		canvas.delete("all")
-		canvas.create_rectangle(0, 0, 320, 240, fill="#26313b", outline="")
-		canvas.create_rectangle(0, 0, 320, 55, fill="#425563", outline="")
-		canvas.create_text(12, 17, text="LIVE ROBOT CAMERA", anchor="w", fill="#d8e3e9", font=("TkDefaultFont", 9, "bold"))
-		canvas.create_oval(288, 10, 300, 22, fill="#e64b4b", outline="")
-		canvas.create_text(305, 16, text="REC", fill="#ffffff", font=("TkDefaultFont", 8, "bold"))
-		canvas.create_rectangle(28, 78, 292, 198, fill="#202830", outline="#81909a", width=2)
-		canvas.create_text(
-			160,
-			138,
-			text="NO FEED FOUND" if self.video_running else "VIDEO FEED STOPPED",
-			fill="#f4f4f4",
-			font=("TkDefaultFont", 12, "bold"),
+		self.video_message.configure(
+			text="NO FEED FOUND" if self.video_running else "VIDEO FEED STOPPED"
 		)
 
 	def _toggle_connection(self):
-		connected = self.connection_status.get().startswith("Status: Connected")
-		if connected:
+		self.connected = not self.connected
+		if not self.connected:
 			self.connection_status.set("Status: Disconnected")
 			self.connect_button.configure(text="Connect", bg=self.COLORS["green"])
 			self.event_status.set("Robot disconnected")
@@ -219,7 +209,6 @@ class NaoControlPanel:
 		if not phrase:
 			messagebox.showinfo("Speech", "Enter a phrase before sending speech.")
 			return
-		self.speech_text.set(phrase)
 		self.event_status.set(f'NAO says: "{phrase}"')
 
 	def _announce(self, command):
@@ -237,7 +226,7 @@ class NaoControlPanel:
 
 def main():
 	root = tk.Tk()
-	NaoControlPanel(root)
+	NaoControlPanel(root, sys.argv[1] if len(sys.argv) > 1 else "")
 	root.mainloop()
 
 
