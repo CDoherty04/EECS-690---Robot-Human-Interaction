@@ -1,0 +1,22 @@
+Lab 2 Design Explanation
+=========================
+
+GUI library choice
+------------------
+I chose Tkinter because it's a built in Python library and allowed me to easily mimic the example GUI.
+
+Advantages
+----------
+- It is included with Python and has no third-party package dependency.
+- It provides the widgets needed for this interface, including LabelFrame, Button, Entry, Label, and message boxes.
+- The layout managers make it straightforward to organize the connection, speech, behavior, and vision sections.
+- Callback functions make the controls interactive with relatively little code.
+
+Disadvantages
+-------------
+- Tkinter's default appearance is basic and depends on the operating system.
+- It is less visually flexible than newer GUI frameworks.
+
+Generative AI use
+-----------------
+I used GenAI to simplify the code, research documentation, and make small changes during development. 
