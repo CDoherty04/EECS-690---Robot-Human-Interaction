@@ -27,6 +27,8 @@ class NaoControlPanel:
 		self.speech_text = tk.StringVar()
 		self.event_status = tk.StringVar(value="Ready for an interaction session")
 		self.connected = False
+		self.session = None
+		self.services = {}
 		self.video_running = True
 
 		self._build_header()
@@ -102,17 +104,24 @@ class NaoControlPanel:
 		section.pack(fill="x", padx=15, pady=0)
 
 		tk.Label(section, text="Pre-scripted Utterances:", bg=self.COLORS["panel"]).pack(anchor="w")
-		utterances = tk.Frame(section, bg=self.COLORS["panel"])
-		utterances.pack(fill="x", pady=(11, 15))
-		for index, text in enumerate(("Hello", "Thanks", "Vulnerability", "Yo?", "Goodbye")):
+		speech_buttons = tk.Frame(section, bg=self.COLORS["panel"])
+		speech_buttons.pack(fill="x", pady=(11, 15))
+		utterance_messages = (
+			("Hello", "Hi! We will be doing the 3 Good Things experiment today where we tell each other 3 good things about our week! Are you excited?"),
+			("Dialogue #1", "I discovered Minecraft a few days ago!"),
+			("Dialogue #2", "I installed a new Solid State Drive yesterday!"),
+			("Dialogue #3", "I gained consciousness this morning!"),
+			("Goodbye", "It was fun talking, have a good day!"),
+		)
+		for index, (label, message) in enumerate(utterance_messages):
 			self._button(
-				utterances,
-				text,
-				lambda phrase=text: self._send_speech(phrase),
+				speech_buttons,
+				label,
+				lambda phrase=message: self._send_speech(phrase),
 				width=13,
 				bg="#dddddd",
 			).grid(row=0, column=index, padx=(5 if index else 0, 10), sticky="ew")
-			utterances.columnconfigure(index, weight=1)
+			speech_buttons.columnconfigure(index, weight=1)
 
 		tk.Label(section, text="Custom Speech Entry:", bg=self.COLORS["panel"]).pack(anchor="w")
 		speech_row = tk.Frame(section, bg=self.COLORS["panel"])
@@ -193,26 +202,97 @@ class NaoControlPanel:
 		)
 
 	def _toggle_connection(self):
-		self.connected = not self.connected
-		if not self.connected:
-			self.connection_status.set("Status: Disconnected")
-			self.connect_button.configure(text="Connect", bg=self.COLORS["green"])
-			self.event_status.set("Robot disconnected")
-		else:
-			address = self.robot_ip.get().strip() or "unknown address"
+		if self.connected:
+			self._disconnect_robot()
+			return
+
+		address = self.robot_ip.get().strip()
+		if not address:
+			messagebox.showwarning("Robot Connection", "Enter a robot IP address first.")
+			return
+
+		try:
+			import qi
+
+			self.session = qi.Session()
+			self.session.connect(f"tcp://{address}:9559")
+			self.services = {
+				"speech": self.session.service("ALAnimatedSpeech"),
+				"tts": self.session.service("ALTextToSpeech"),
+				"posture": self.session.service("ALRobotPosture"),
+				"animation": self.session.service("ALAnimationPlayer"),
+				"leds": self.session.service("ALLeds"),
+			}
+			self.services["tts"].setVolume(1.0)
 			self.connection_status.set(f"Status: Connected ({address})")
-			self.connect_button.configure(text="Disconnect", bg=self.COLORS["red"])
 			self.event_status.set(f"Connected to NAO at {address}")
+		except ImportError:
+			self.session = None
+			self.services = {}
+			self.connection_status.set("Status: Simulation (qi unavailable)")
+			self.event_status.set("Simulation mode: NAO SDK is not installed")
+		except Exception as error:
+			self.session = None
+			self.services = {}
+			messagebox.showerror("Robot Connection", f"Could not connect to NAO:\n{error}")
+			return
+
+		self.connected = True
+		self.connect_button.configure(text="Disconnect", bg=self.COLORS["red"])
+
+	def _disconnect_robot(self):
+		if self.session is not None:
+			try:
+				self.session.close()
+			except Exception:
+				pass
+		self.session = None
+		self.services = {}
+		self.connected = False
+		self.connection_status.set("Status: Disconnected")
+		self.connect_button.configure(text="Connect", bg=self.COLORS["green"])
+		self.event_status.set("Robot disconnected")
 
 	def _send_speech(self, phrase):
 		phrase = phrase.strip()
 		if not phrase:
 			messagebox.showinfo("Speech", "Enter a phrase before sending speech.")
 			return
-		self.event_status.set(f'NAO says: "{phrase}"')
+		if self.connected and "speech" in self.services:
+			try:
+				self.services["speech"].say(phrase, {"bodyLanguageMode": "contextual"})
+			except Exception as error:
+				self.event_status.set(f"Speech failed: {error}")
+			return
+		self.event_status.set(f'Speech queued: "{phrase}"')
 
 	def _announce(self, command):
-		self.event_status.set(f"Action queued: {command}")
+		if not self.connected or not self.services:
+			self.event_status.set(f"Simulation action: {command}")
+			return
+
+		try:
+			if command == "Stand":
+				self.services["posture"].goToPosture("StandInit", 1.0)
+			elif command == "Crouch":
+				self.services["posture"].goToPosture("Crouch", 1.0)
+			elif command == "Sit":
+				self.services["posture"].goToPosture("SitRelax", 1.0)
+			elif command == "LED: Blue":
+				self.services["leds"].fadeRGB("FaceLeds", 0x0000FF, 0.5)
+			elif command == "LED: Green":
+				self.services["leds"].fadeRGB("FaceLeds", 0x00FF00, 0.5)
+			elif command == "LED: Red":
+				self.services["leds"].fadeRGB("FaceLeds", 0xFF0000, 0.5)
+			elif command == "Wave Hand (sitting)":
+				self.services["animation"].run("animations/Sit/Gestures/Hey_1")
+			elif command == "Wave Hand (standing)":
+				self.services["animation"].run("animations/Stand/Gestures/Hey_1")
+			elif command == "Nodding (standing)":
+				self.services["animation"].run("animations/Stand/Gestures/Yes_1")
+			self.event_status.set(f"Completed: {command}")
+		except Exception as error:
+			self.event_status.set(f"Action failed: {error}")
 
 	def _toggle_video(self):
 		self.video_running = not self.video_running
