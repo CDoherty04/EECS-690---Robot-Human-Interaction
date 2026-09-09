@@ -135,9 +135,9 @@ class NaoControlPanel:
 		# Nonverbal Gestures
 		gestures = tk.LabelFrame(section, text="Nonverbal Gestures", padx=10, pady=8)
 		gestures.grid(row=0, column=0, sticky="nsew")
-		self._button(gestures, "Wave Hand (sitting)", lambda: self._announce("Wave Hand (sitting)")).pack(fill="x")
-		self._button(gestures, "Wave Hand (standing)", lambda: self._announce("Wave Hand (standing)")).pack(fill="x", pady=(10, 0))
-		self._button(gestures, "Nodding (standing)", lambda: self._announce("Nodding (standing)")).pack(fill="x", pady=(10, 0))
+		self._button(gestures, "Nod Head", lambda: self._announce("Nod Head")).pack(fill="x")
+		self._button(gestures, "Shake Head", lambda: self._announce("Shake Head")).pack(fill="x", pady=(10, 0))
+		self._button(gestures, "Wave", lambda: self._announce("Wave")).pack(fill="x", pady=(10, 0))
 
 		# LED Facial Displays
 		leds = tk.LabelFrame(section, text="LED Facial Displays", padx=10, pady=8)
@@ -206,10 +206,15 @@ class NaoControlPanel:
 				"speech": session.service("ALAnimatedSpeech"),
 				"tts": session.service("ALTextToSpeech"),
 				"posture": session.service("ALRobotPosture"),
+				"motion": session.service("ALMotion"),
 				"leds": session.service("ALLeds"),
 				"video": session.service("ALVideoDevice"),
 				"tracker": session.service("ALTracker"),
 			}
+			try:
+				services["awareness"] = session.service("ALBasicAwareness")
+			except Exception:
+				pass
 			services["tts"].setVolume(1.0)
 			success = True
 		except Exception as error:
@@ -237,7 +242,10 @@ class NaoControlPanel:
 		self.connected = True
 		self.connection_status.set(f"Status: Connected ({address})")
 		self.connect_button.configure(text="Disconnect", bg="red")
-		self._start_person_tracking()
+		try:
+			self._start_person_tracking()
+		except Exception:
+			pass
 		self._start_video_feed()
 
 	# Disconnect from the robot and clean up resources
@@ -284,12 +292,12 @@ class NaoControlPanel:
 				self._set_all_leds(0x00FF00)
 			elif command == "LED: Red":
 				self._set_all_leds(0xFF0000)
-			elif command == "Wave Hand (sitting)":
-				self._play_gesture("animations/Sit/Gestures/Hey_1")
-			elif command == "Wave Hand (standing)":
-				self._play_gesture("animations/Stand/Gestures/Hey_1")
-			elif command == "Nodding (standing)":
-				self._play_gesture("animations/Stand/Gestures/Yes_1")
+			elif command == "Nod Head":
+				self._nod_head()
+			elif command == "Shake Head":
+				self._shake_head()
+			elif command == "Wave":
+				self._wave()
 		except Exception as error:
 			messagebox.showerror("Action failed", f"Could not perform action on NAO:\n{error}")
 
@@ -299,15 +307,57 @@ class NaoControlPanel:
 	def _set_all_leds(self, color):
 		self.services["leds"].fadeRGB("AllLeds", color, 0.5)
 
-	def _play_gesture(self, animation):
-		self.services["speech"].say(f"^start({animation})")
+	def _nod_head(self):
+		self.services["motion"].angleInterpolation(
+			["HeadPitch"],
+			[[0.2, -0.2, 0.2]],
+			[[0.4, 0.8, 1.2]],
+			True,
+		)
+
+	def _shake_head(self):
+		self.services["motion"].angleInterpolation(
+			["HeadYaw"],
+			[[0.5, -0.5, 0.5, 0.0]],
+			[[0.3, 0.6, 0.9, 1.2]],
+			True,
+		)
+
+	def _wave(self):
+		self.services["motion"].angleInterpolation(
+			["RShoulderPitch", "RShoulderRoll", "RElbowRoll", "RWristYaw"],
+			[
+				[0.4, 0.4, 0.4, 0.4, 0.4, 1.0],
+				[-0.8, -0.8, -0.8, -0.8, -0.8, -0.5],
+				[0.8, 1.2, 0.8, 1.2, 0.8, 0.5],
+				[-0.8, 0.8, -0.8, 0.8, 0.0, 0.0],
+			],
+			[
+				[0.6, 1.0, 1.4, 1.8, 2.2, 2.8],
+				[0.6, 1.0, 1.4, 1.8, 2.2, 2.8],
+				[0.6, 1.0, 1.4, 1.8, 2.2, 2.8],
+				[0.6, 1.0, 1.4, 1.8, 2.2, 2.8],
+			],
+			True,
+		)
 
 	def _start_person_tracking(self):
+		if "awareness" in self.services:
+			self.services["awareness"].setTrackingMode("Head")
+			self.services["awareness"].setEngagementMode("FullyEngaged")
+			self.services["awareness"].startAwareness()
+			return
 		self.services["tracker"].registerTarget("People", 0.5)
 		self.services["tracker"].setMode("Head")
 		self.services["tracker"].track("People")
 
 	def _stop_person_tracking(self):
+		if "awareness" in self.services:
+			try:
+				self.services["awareness"].stopAwareness()
+			except Exception:
+				pass
+			return
 		if "tracker" not in self.services:
 			return
 		try:
