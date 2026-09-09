@@ -135,27 +135,21 @@ class NaoControlPanel:
 		# Nonverbal Gestures
 		gestures = tk.LabelFrame(section, text="Nonverbal Gestures", padx=10, pady=8)
 		gestures.grid(row=0, column=0, sticky="nsew")
-		self._button(gestures, "Nod Head", lambda: self._announce("Nod Head")).pack(fill="x")
-		self._button(gestures, "Shake Head", lambda: self._announce("Shake Head")).pack(fill="x", pady=(10, 0))
-		self._button(gestures, "Wave", lambda: self._announce("Wave")).pack(fill="x", pady=(10, 0))
-
-		# LED Facial Displays
-		leds = tk.LabelFrame(section, text="LED Facial Displays", padx=10, pady=8)
-		leds.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
-		self._button(leds, "LED: Blue", lambda: self._announce("LED: Blue"), bg="blue", activebackground="#4d4dff", fg="white").pack(fill="x")
-		self._button(leds, "LED: Green", lambda: self._announce("LED: Green"), bg="green", activebackground="#4caf50", fg="white").pack(fill="x", pady=(10, 0))
-		self._button(leds, "LED: Red", lambda: self._announce("LED: Red"), bg="red", activebackground="#ff4d4d", fg="white").pack(fill="x", pady=(10, 0))
+		self._button(gestures, "Agree", lambda: self._announce("Agree"), bg="green", activebackground="#4caf50", fg="white").pack(fill="x")
+		self._button(gestures, "Disagree", lambda: self._announce("Disagree"), bg="red", activebackground="#ff4d4d", fg="white").pack(fill="x", pady=(10, 0))
+		self._button(gestures, "Thinking", lambda: self._announce("Thinking"), bg="gray", activebackground="#777777", fg="white").pack(fill="x", pady=(10, 0))
+		self._button(gestures, "Wave", lambda: self._announce("Wave"), bg="blue", activebackground="#4d4dff", fg="white").pack(fill="x", pady=(10, 0))
 
 		# Posture Changes
 		postures = tk.LabelFrame(section, text="Posture Changes", padx=10, pady=8)
-		postures.grid(row=0, column=2, sticky="nsew", padx=(10, 0))
+		postures.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
 		self._button(postures, "Stand", lambda: self._announce("Stand")).pack(fill="x")
 		self._button(postures, "Crouch", lambda: self._announce("Crouch")).pack(fill="x", pady=(10, 0))
 		self._button(postures, "Sit", lambda: self._announce("Sit")).pack(fill="x", pady=(10, 0))
+		self._button(postures, "Relaxed Sit", lambda: self._announce("Relaxed Sit")).pack(fill="x", pady=(10, 0))
 
 		section.columnconfigure(0, weight=1)
 		section.columnconfigure(1, weight=1)
-		section.columnconfigure(2, weight=1)
 
 	# Section for live video feed from the robot's camera
 	def _build_video_section(self):
@@ -285,18 +279,20 @@ class NaoControlPanel:
 			elif command == "Crouch":
 				self._change_posture("Crouch")
 			elif command == "Sit":
+				self._change_posture("Sit")
+			elif command == "Relaxed Sit":
 				self._change_posture("SitRelax")
-			elif command == "LED: Blue":
-				self._set_all_leds(0x0000FF)
-			elif command == "LED: Green":
+			elif command == "Agree":
 				self._set_all_leds(0x00FF00)
-			elif command == "LED: Red":
-				self._set_all_leds(0xFF0000)
-			elif command == "Nod Head":
 				self._nod_head()
-			elif command == "Shake Head":
+			elif command == "Disagree":
+				self._set_all_leds(0xFF0000)
 				self._shake_head()
+			elif command == "Thinking":
+				self._set_all_leds(0xFFFFFF)
+				self._think()
 			elif command == "Wave":
+				self._set_all_leds(0x0000FF)
 				self._wave()
 		except Exception as error:
 			messagebox.showerror("Action failed", f"Could not perform action on NAO:\n{error}")
@@ -320,6 +316,14 @@ class NaoControlPanel:
 			["HeadYaw"],
 			[[0.5, -0.5, 0.5, 0.0]],
 			[[0.3, 0.6, 0.9, 1.2]],
+			True,
+		)
+
+	def _think(self):
+		self.services["motion"].angleInterpolation(
+			["HeadPitch", "LShoulderPitch", "LElbowRoll"],
+			[[-0.35, -0.35], [1.0, 1.0], [-1.0, -1.0]],
+			[[0.5, 1.5], [0.5, 1.5], [0.5, 1.5]],
 			True,
 		)
 
