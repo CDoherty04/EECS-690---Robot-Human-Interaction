@@ -1,7 +1,8 @@
 import sys
+import threading
 import tkinter as tk
 from tkinter import messagebox
-
+import qi
 
 class NaoControlPanel:
 	"""Desktop control panel for a NAO Wizard-of-Oz interaction session."""
@@ -14,9 +15,12 @@ class NaoControlPanel:
 		self.connection_status = tk.StringVar(value="Status: Disconnected")
 		self.speech_text = tk.StringVar()
 		self.connected = False
+		self.connecting = False
 		self.session = None
 		self.services = {}
-		self.video_running = True
+		self.video_running = False
+		self.video_client = None
+		self.video_after_id = None
 
 		self._build_connection_section()
 		self._build_speech_section()
@@ -131,23 +135,23 @@ class NaoControlPanel:
 		# Nonverbal Gestures
 		gestures = tk.LabelFrame(section, text="Nonverbal Gestures", padx=10, pady=8)
 		gestures.grid(row=0, column=0, sticky="nsew")
-		self._button(gestures, "Wave Hand (sitting)", lambda: self._announce("Wave Hand (sitting)"), bg="gray", fg="white", width=19).pack(fill="x")
-		self._button(gestures, "Wave Hand (standing)", lambda: self._announce("Wave Hand (standing)"), bg="gray", fg="white", width=19).pack(fill="x", pady=(10, 0))
-		self._button(gestures, "Nodding (standing)", lambda: self._announce("Nodding (standing)"), bg="gray", fg="white", width=19).pack(fill="x", pady=(10, 0))
+		self._button(gestures, "Wave Hand (sitting)", lambda: self._announce("Wave Hand (sitting)")).pack(fill="x")
+		self._button(gestures, "Wave Hand (standing)", lambda: self._announce("Wave Hand (standing)")).pack(fill="x", pady=(10, 0))
+		self._button(gestures, "Nodding (standing)", lambda: self._announce("Nodding (standing)")).pack(fill="x", pady=(10, 0))
 
 		# LED Facial Displays
 		leds = tk.LabelFrame(section, text="LED Facial Displays", padx=10, pady=8)
 		leds.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
-		self._button(leds, "LED: Blue", lambda: self._announce("LED: Blue"), bg="blue", fg="white", width=19).pack(fill="x")
-		self._button(leds, "LED: Green", lambda: self._announce("LED: Green"), bg="green", fg="white", width=19).pack(fill="x", pady=(10, 0))
-		self._button(leds, "LED: Red", lambda: self._announce("LED: Red"), bg="red", fg="white", width=19).pack(fill="x", pady=(10, 0))
+		self._button(leds, "LED: Blue", lambda: self._announce("LED: Blue"), bg="blue", activebackground="#4d4dff", fg="white").pack(fill="x")
+		self._button(leds, "LED: Green", lambda: self._announce("LED: Green"), bg="green", activebackground="#4caf50", fg="white").pack(fill="x", pady=(10, 0))
+		self._button(leds, "LED: Red", lambda: self._announce("LED: Red"), bg="red", activebackground="#ff4d4d", fg="white").pack(fill="x", pady=(10, 0))
 
 		# Posture Changes
 		postures = tk.LabelFrame(section, text="Posture Changes", padx=10, pady=8)
 		postures.grid(row=0, column=2, sticky="nsew", padx=(10, 0))
-		self._button(postures, "Stand", lambda: self._announce("Stand"), bg="gray", fg="white", width=19).pack(fill="x")
-		self._button(postures, "Crouch", lambda: self._announce("Crouch"), bg="gray", fg="white", width=19).pack(fill="x", pady=(10, 0))
-		self._button(postures, "Sit", lambda: self._announce("Sit"), bg="gray", fg="white", width=19).pack(fill="x", pady=(10, 0))
+		self._button(postures, "Stand", lambda: self._announce("Stand")).pack(fill="x")
+		self._button(postures, "Crouch", lambda: self._announce("Crouch")).pack(fill="x", pady=(10, 0))
+		self._button(postures, "Sit", lambda: self._announce("Sit")).pack(fill="x", pady=(10, 0))
 
 		section.columnconfigure(0, weight=1)
 		section.columnconfigure(1, weight=1)
@@ -156,20 +160,21 @@ class NaoControlPanel:
 	# Section for live video feed from the robot's camera
 	def _build_video_section(self):
 		section = self._section(self.root, "Live Robot Vision")
-		section.pack(fill="both", expand=True, padx=15, pady=(0, 0))
+		section.pack(fill="both", expand=True, padx=15, pady=(0, 15))
+		video_frame = tk.Frame(section, width=320, height=240, bg="gray")
+		video_frame.pack(pady=(4, 7))
+		video_frame.pack_propagate(False)
 		self.video_message = tk.Label(
-			section,
+			video_frame,
 			text="NO FEED FOUND",
-			width=34,
-			height=8,
 			bg="gray",
 		)
-		self.video_message.pack(pady=(4, 7))
+		self.video_message.pack(fill="both", expand=True)
 		self.video_button = self._button(
 			section,
-			"Stop Video Feed",
+			"Start Video Feed",
 			self._toggle_video,
-			bg="red",
+			bg="green",
 			fg="white",
 			width=14,
 		)
@@ -179,43 +184,66 @@ class NaoControlPanel:
 		if self.connected:
 			self._disconnect_robot()
 			return
+		if self.connecting:
+			return
 
 		address = self.robot_ip.get().strip()
 		if not address:
 			messagebox.showwarning("Robot Connection", "Enter a robot IP address first.")
 			return
 
-		try:
-			import qi
+		self.connecting = True
+		self.connection_status.set("Status: Connecting...")
+		self.connect_button.configure(state="disabled")
+		threading.Thread(target=self._connect_robot, args=(address,), daemon=True).start()
 
-			self.session = qi.Session()
-			self.session.connect(f"tcp://{address}:9559")
-			self.services = {
-				"speech": self.session.service("ALAnimatedSpeech"),
-				"tts": self.session.service("ALTextToSpeech"),
-				"posture": self.session.service("ALRobotPosture"),
-				"animation": self.session.service("ALAnimationPlayer"),
-				"leds": self.session.service("ALLeds"),
+	def _connect_robot(self, address):
+		connection_error = None
+		try:
+			session = qi.Session()
+			session.connect(f"tcp://{address}:9559")
+			services = {
+				"speech": session.service("ALAnimatedSpeech"),
+				"tts": session.service("ALTextToSpeech"),
+				"posture": session.service("ALRobotPosture"),
+				"leds": session.service("ALLeds"),
+				"video": session.service("ALVideoDevice"),
+				"tracker": session.service("ALTracker"),
 			}
-			self.services["tts"].setVolume(1.0)
-			self.connection_status.set(f"Status: Connected ({address})")
-		except ImportError:
-			self.session = None
-			self.services = {}
-			self.connected = False
-			self.connection_status.set("Status: Simulation (qi unavailable)")
-			messagebox.showerror("Simulation mode", "NAO SDK is not installed")
+			services["tts"].setVolume(1.0)
+			success = True
 		except Exception as error:
+			session = None
+			services = {}
+			success = False
+			connection_error = error
+
+		self.root.after(0, self._finish_connection, address, session, services, success, connection_error)
+
+	def _finish_connection(self, address, session, services, success, error):
+		self.connecting = False
+		self.connect_button.configure(state="normal")
+		if not success:
+			if session is not None:
+				session.close()
 			self.session = None
 			self.services = {}
+			self.connection_status.set("Status: Disconnected")
 			messagebox.showerror("Robot Connection", f"Could not connect to NAO:\n{error}")
 			return
 
+		self.session = session
+		self.services = services
 		self.connected = True
+		self.connection_status.set(f"Status: Connected ({address})")
 		self.connect_button.configure(text="Disconnect", bg="red")
+		self._start_person_tracking()
+		self._start_video_feed()
 
 	# Disconnect from the robot and clean up resources
 	def _disconnect_robot(self):
+		self._stop_video_feed("NO FEED FOUND")
+		self._stop_person_tracking()
 		if self.session is not None:
 			self.session.close()
 		self.session = None
@@ -251,38 +279,105 @@ class NaoControlPanel:
 			elif command == "Sit":
 				self._change_posture("SitRelax")
 			elif command == "LED: Blue":
-				self._set_face_led(0x0000FF)
+				self._set_all_leds(0x0000FF)
 			elif command == "LED: Green":
-				self._set_face_led(0x00FF00)
+				self._set_all_leds(0x00FF00)
 			elif command == "LED: Red":
-				self._set_face_led(0xFF0000)
+				self._set_all_leds(0xFF0000)
 			elif command == "Wave Hand (sitting)":
-				self._play_animation("animations/Sit/Gestures/Hey_1")
+				self._play_gesture("animations/Sit/Gestures/Hey_1")
 			elif command == "Wave Hand (standing)":
-				self._play_animation("animations/Stand/Gestures/Hey_1")
+				self._play_gesture("animations/Stand/Gestures/Hey_1")
 			elif command == "Nodding (standing)":
-				self._play_animation("animations/Stand/Gestures/Yes_1")
+				self._play_gesture("animations/Stand/Gestures/Yes_1")
 		except Exception as error:
 			messagebox.showerror("Action failed", f"Could not perform action on NAO:\n{error}")
 
 	def _change_posture(self, posture):
 		self.services["posture"].goToPosture(posture, 1.0)
 
-	def _set_face_led(self, color):
-		self.services["leds"].fadeRGB("FaceLeds", color, 0.5)
+	def _set_all_leds(self, color):
+		self.services["leds"].fadeRGB("AllLeds", color, 0.5)
 
-	def _play_animation(self, animation):
-		self.services["animation"].run(animation)
+	def _play_gesture(self, animation):
+		self.services["speech"].say(f"^start({animation})")
 
-	# Changes feed boolean and updates rendered content
-	def _toggle_video(self):
-		self.video_running = not self.video_running
-		if self.video_running:
-			self.video_message.configure(text="NO FEED FOUND")
+	def _start_person_tracking(self):
+		self.services["tracker"].registerTarget("People", 0.5)
+		self.services["tracker"].setMode("Head")
+		self.services["tracker"].track("People")
+
+	def _stop_person_tracking(self):
+		if "tracker" not in self.services:
+			return
+		try:
+			self.services["tracker"].stopTracker()
+			self.services["tracker"].unregisterTarget("People")
+		except Exception:
+			pass
+
+	def _start_video_feed(self):
+		if not self.connected or "video" not in self.services:
+			messagebox.showwarning("Robot Connection", "Connect to NAO before starting the video feed.")
+			return
+
+		try:
+			self.video_client = self.services["video"].subscribeCamera(
+				"NaoWozGui",
+				0,
+				1,
+				11,
+				10,
+			)
+			self.video_running = True
 			self.video_button.configure(text="Stop Video Feed", bg="red")
-		else:
-			self.video_message.configure(text="VIDEO FEED STOPPED")
+			self._update_video_frame()
+		except Exception as error:
+			self.video_client = None
+			self.video_running = False
+			self.video_message.configure(text="VIDEO FEED UNAVAILABLE")
 			self.video_button.configure(text="Start Video Feed", bg="green")
+			messagebox.showerror("Video Feed", f"Could not start video feed:\n{error}")
+
+	def _stop_video_feed(self, message="VIDEO FEED STOPPED"):
+		if self.video_after_id is not None:
+			self.root.after_cancel(self.video_after_id)
+			self.video_after_id = None
+		if self.video_client is not None and "video" in self.services:
+			try:
+				self.services["video"].unsubscribe(self.video_client)
+			except Exception:
+				pass
+		self.video_client = None
+		self.video_running = False
+		self.video_message.configure(image="", text=message)
+		self.video_message.image = None
+		self.video_button.configure(text="Start Video Feed", bg="green")
+
+	def _update_video_frame(self):
+		if not self.video_running or self.video_client is None:
+			return
+
+		try:
+			image = self.services["video"].getImageRemote(self.video_client)
+			if image is not None:
+				width, height, pixels = image[0], image[1], image[6]
+				ppm_data = f"P6\n{width} {height}\n255\n".encode() + bytes(pixels)
+				photo = tk.PhotoImage(data=ppm_data, format="PPM")
+				self.video_message.configure(image=photo, text="")
+				self.video_message.image = photo
+				self.services["video"].releaseImage(self.video_client)
+			self.video_after_id = self.root.after(100, self._update_video_frame)
+		except Exception as error:
+			self._stop_video_feed()
+			messagebox.showerror("Video Feed", f"Video feed stopped:\n{error}")
+
+	# Start or stop the live camera feed.
+	def _toggle_video(self):
+		if self.video_running:
+			self._stop_video_feed()
+		else:
+			self._start_video_feed()
 
 def main():
 	root = tk.Tk()
