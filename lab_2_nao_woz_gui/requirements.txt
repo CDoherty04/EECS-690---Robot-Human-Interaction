@@ -1,3 +1,1 @@
-# No third-party Python packages are required.
-# The GUI uses tkinter, tkinter.messagebox, and sys from Python's standard library.
-# tkinter may need to be installed through the operating system's Python package manager.
+qi==3.1.5
