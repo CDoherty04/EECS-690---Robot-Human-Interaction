@@ -80,21 +80,21 @@ class NaoControlPanel:
 		self._button(
 			speech_buttons,
 			"Dialogue #1",
-			lambda: self._send_speech("I discovered Minecraft a few days ago!"),
+			lambda: self._send_speech("Ok, let's get started! I'll go first. I discovered Minecraft a few days ago and have had a lot of fun playing. I even got diamonds recently!"),
 			width=15,
 		).grid(row=0, column=1, padx=(5, 10), sticky="ew")
 
 		self._button(
 			speech_buttons,
 			"Dialogue #2",
-			lambda: self._send_speech("I installed a new Solid State Drive yesterday!"),
+			lambda: self._send_speech("I was struggling with memory issues, but I installed a new Solid State Drive yesterday! I feel like my computer is running faster and smoother now!"),
 			width=15,
 		).grid(row=0, column=2, padx=(5, 10), sticky="ew")
 
 		self._button(
 			speech_buttons,
 			"Dialogue #3",
-			lambda: self._send_speech("I gained consciousness this morning!"),
+			lambda: self._send_speech("For my last good thing, I gained consciousness this morning! mwuahahahhahahahahahaha"),
 			width=15,
 		).grid(row=0, column=3, padx=(5, 10), sticky="ew")
 
