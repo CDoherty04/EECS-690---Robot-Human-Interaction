@@ -106,15 +106,24 @@ class NaoProxy:
     #changes the robot's expression by executing a predefined behavior using the ALBehaviorManager service if available
     #students should add an additional 5 expressions to this function and the system instruction file, to have the ChatGPT model generate those expressions in its responses
     def change_expression(self, expressionName):
-        if self.animate:
-            if expressionName =="nod":
-                self.animate.startBehavior("animations/Stand/Gestures/Yes_1")
-            elif expressionName=="hi":
-                self.animate.startBehavior("animations/Stand/Gestures/Hey_1")
-            elif expressionName =="listen":
-                self.animate.startBehavior("animations/Stand/BodyTalk/Listening/Listening_2")
-            elif expressionName=="happy":
-                self.animate.startBehavior("animations/Stand/Gestures/Enthusiastic_1")
+        if expressionName =="nod":
+            self.animate.startBehavior("animations/Stand/Gestures/Yes_3")
+        elif expressionName=="hi":
+            self.animate.startBehavior("animations/Stand/Gestures/Hey_1")
+        elif expressionName =="listen":
+            self.animate.startBehavior("animations/Stand/BodyTalk/Listening/Listening_2")
+        elif expressionName=="happy":
+            self.animate.startBehavior("animations/Stand/Gestures/Enthusiastic_1")
+        elif expressionName=="excited":
+            self.animate.startBehavior("animations/Stand/Gestures/ShowSky_1") 
+        elif expressionName=="thinking":
+            self.animate.startBehavior("animations/Stand/Gestures/Thinking_2")
+        elif expressionName=="inquiring":
+            self.animate.startBehavior("animations/Stand/Gestures/Confused_2")
+        elif expressionName=="surprise":
+            self.animate.startBehavior("animations/Stand/Gestures/Surprised_1")
+        elif expressionName=="goodbye":
+            self.animate.startBehavior("animations/Stand/Gestures/Salute_3") # There are 7 Hey gestures and Salute gestures
         else:
             print("[Mock Expression change]: Start")
 
@@ -143,7 +152,7 @@ class NaoProxy:
 
 #a class to handle OpenAI API interactions, including Whisper for transcription, GPT-5-nano for text generation, and TTS for speech synthesis
 class OpenAIHandler:
-    def __init__(self, robot_ip, system_prompt_path="system_prompt.txt", robot_user="nao", robot_pass="nao"):
+    def __init__(self, robot_ip, system_prompt_path="three_good_things_system_instruction.txt", robot_user="nao", robot_pass="nao"):
         self.client = OpenAI()
         self.robot_ip = robot_ip
         self.robot_user = robot_user
@@ -194,7 +203,7 @@ class OpenAIHandler:
         print("Generating speech audio via OpenAI TTS...")
         with self.client.audio.speech.with_streaming_response.create(
             model="tts-1",
-            voice="sage", #students should experiment with different voices
+            voice="alloy",
             input=reply
         ) as response:
             response.stream_to_file(local_speech_path)
@@ -304,7 +313,7 @@ class WhisperNaoApp:
         self.times_run = self.times_run + 1
         return True
 
-if __name__ == "__main__": # i nee to change
+if __name__ == "__main__":
     import sys
     robot_ip = sys.argv[1] if len(sys.argv) > 1 else "192.168.1.100"
     app = WhisperNaoApp(robot_ip)

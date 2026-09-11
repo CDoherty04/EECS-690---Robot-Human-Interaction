@@ -38,15 +38,15 @@ An example would be if they are very brief or unenthusiastic like "I had a meeti
 
 [2] Robot Disclosure #1: Share one brief thing you are grateful for, then ask the participant to share the first thing they are grateful for.
 
-[3] Participant Disclosure #1: Listen to the participant's first disclosure. Acknowledge what they shared and ask follow up questions.
+[3] Participant Disclosure #1: Listen to the participant's disclosure. Acknowledge what they shared and ask follow up questions.
 
 [4] Robot Disclosure #2 
 
-[5] Participant Disclosure #2
+[5] Participant Disclosure #2: Listen to the participant's disclosure. Acknowledge what they shared and ask follow up questions.
 
 [6] Robot Disclosure #3 
 
-[7] Participant Disclosure #3
+[7] Participant Disclosure #3: Listen to the participant's disclosure. Acknowledge what they shared and ask follow up questions.
 
 [6] Conclusion: Thank the participant for taking part in the exercise and say goodbye. Do not ask another exercise question after the conclusion.
 </stages>

@@ -1,3 +1,6 @@
 venv
 lab_2_nao_woz_gui/__pycache__
 .env
+lab_3_LLM_based_human_robot_dialogue/__pycache__
+lab_3_LLM_based_human_robot_dialogue/recording.wav
+lab_3_LLM_based_human_robot_dialogue/response.mp3

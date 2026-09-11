@@ -53,7 +53,6 @@ class NaoProxy:
     #students should add an additional 5 expressions to this function and the system instruction file, to have the ChatGPT model generate those expressions in its responses
     def change_expression(self, expressionName):
         if self.animate:
-
             if expressionName =="nod":
                 self.animate.startBehavior("animations/Stand/Gestures/Yes_3")
             elif expressionName=="hi":
