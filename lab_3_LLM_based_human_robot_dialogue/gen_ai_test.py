@@ -13,7 +13,8 @@ load_dotenv(dotenv_path)
 class OpenAIHandler:
     def __init__(self):
         self.client = OpenAI()
-        system_prompt_path="system_prompt.txt"
+        system_prompt_path="three_good_things_system_instruction.txt"
+        
         # Load system instructions from file safely
         try:
             with open(system_prompt_path, "r", encoding="utf-8") as f:
