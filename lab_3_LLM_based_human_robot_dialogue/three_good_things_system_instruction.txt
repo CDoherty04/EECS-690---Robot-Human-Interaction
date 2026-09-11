@@ -24,7 +24,7 @@ Please refrain from choosing an expression multiple times in a row: [
 'happy',
 'excited',
 'thinking',
-'grateful',
+'inquiring',
 'surprise',
 'goodbye'
 ]

@@ -53,14 +53,25 @@ class NaoProxy:
     #students should add an additional 5 expressions to this function and the system instruction file, to have the ChatGPT model generate those expressions in its responses
     def change_expression(self, expressionName):
         if self.animate:
+
             if expressionName =="nod":
-                self.animate.startBehavior("animations/Stand/Gestures/Yes_1")
+                self.animate.startBehavior("animations/Stand/Gestures/Yes_3")
             elif expressionName=="hi":
                 self.animate.startBehavior("animations/Stand/Gestures/Hey_1")
             elif expressionName =="listen":
                 self.animate.startBehavior("animations/Stand/BodyTalk/Listening/Listening_2")
             elif expressionName=="happy":
                 self.animate.startBehavior("animations/Stand/Gestures/Enthusiastic_1")
+            elif expressionName=="excited":
+                self.animate.startBehavior("animations/Stand/Gestures/ShowSky_1") 
+            elif expressionName=="thinking":
+                self.animate.startBehavior("animations/Stand/Gestures/Thinking_2")
+            elif expressionName=="inquiring":
+                self.animate.startBehavior("animations/Stand/Gestures/Confused_2")
+            elif expressionName=="surprise":
+                self.animate.startBehavior("animations/Stand/Gestures/Surprised_1")
+            elif expressionName=="goodbye":
+                self.animate.startBehavior("animations/Stand/Gestures/Salute_3") # There are 7 Hey gestures and Salute gestures
         else:
             print("[Mock Expression change]: Start")
 
@@ -88,7 +99,7 @@ class WhisperNaoApp:
             print("Skipping execution because session is not connected.")
             return False
 
-        reactionList = ['hi', 'nod', 'listen', 'happy'] #edit this list to include the reactions you put in the change_expression definition
+        reactionList = ['nod', 'hi', 'listen', 'happy', 'excited', 'thinking', 'inquiring', 'surprise', 'goodbye']
 
         for item in reactionList:
             self.nao.change_expression(item)
@@ -104,5 +115,10 @@ if __name__ == "__main__":
     robot_ip = sys.argv[1] if len(sys.argv) > 1 else "192.168.1.100"
     app = WhisperNaoApp(robot_ip)
     robotConnected = True
+
+    animate = app.nao.animate
+    print(animate.getInstalledBehaviors())
+    print(animate.getDefaultBehaviors())
+    
     while robotConnected:
         robotConnected = app.run_pipeline()
